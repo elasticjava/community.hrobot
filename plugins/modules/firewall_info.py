@@ -35,9 +35,18 @@ attributes:
 
 options:
   server_ip:
-    description: The server's main IP address.
+    description:
+      - The server's main IP address.
+      - Exactly one of O(server_ip) and O(server_number) must be specified.
+      - Note that Hetzner deprecated identifying the server's firewall by the server's main IP.
+        Using this option can thus stop working at any time in the future. Use O(server_number) instead.
     type: str
-    required: true
+  server_number:
+    description:
+      - The server's number.
+      - Exactly one of O(server_ip) and O(server_number) must be specified.
+    type: int
+    version_added: 1.8.0
   wait_for_configured:
     description:
       - Whether to wait until the firewall has been successfully configured before
@@ -85,9 +94,14 @@ firewall:
     port:
       description:
         - Switch port of firewall.
-        - C(main) or C(kvm).
+        - V(main) or V(kvm).
       type: str
       sample: main
+    filter_ipv6:
+      description:
+        - Whether the firewall rules apply to IPv6 as well or not.
+      type: bool
+      sample: false
     server_ip:
       description:
         - Server's main IP address.
@@ -101,9 +115,9 @@ firewall:
     status:
       description:
         - Status of the firewall.
-        - C(active) or C(disabled).
-        - Will be C(in process) if the firewall is currently updated, and
-          I(wait_for_configured) is set to C(false) or I(timeout) to a too small value.
+        - V(active) or V(disabled).
+        - Will be V(in process) if the firewall is currently updated, and
+          O(wait_for_configured) is set to V(false) or O(timeout) to a too small value.
       type: str
       sample: active
     allowlist_hos:
@@ -115,7 +129,7 @@ firewall:
     whitelist_hos:
       description:
         - Whether Hetzner services have access.
-        - Old name of return value C(allowlist_hos), will be removed eventually.
+        - Old name of return value V(allowlist_hos), will be removed eventually.
       type: bool
       sample: true
     rules:
@@ -137,6 +151,7 @@ firewall:
             ip_version:
               description:
                 - Internet protocol version.
+                - No value means the rule applies both to IPv4 and IPv6.
               type: str
               sample: ipv4
             dst_ip:
@@ -163,7 +178,7 @@ firewall:
               sample: null
             protocol:
               description:
-                - Protocol above IP layer
+                - Protocol above IP layer.
               type: str
               sample: tcp
             tcp_flags:
@@ -174,9 +189,70 @@ firewall:
             action:
               description:
                 - Action if rule matches.
-                - C(accept) or C(discard).
+                - V(accept) or V(discard).
               type: str
               sample: accept
+              choices:
+                - accept
+                - discard
+        output:
+          description:
+            - Output firewall rules.
+          type: list
+          elements: dict
+          contains:
+            name:
+              description:
+                - Name of the firewall rule.
+              type: str
+              sample: Allow HTTP access to server
+            ip_version:
+              description:
+                - Internet protocol version.
+                - No value means the rule applies both to IPv4 and IPv6.
+              type: str
+              sample: ~
+            dst_ip:
+              description:
+                - Destination IP address or subnet address.
+                - CIDR notation.
+              type: str
+              sample: 1.2.3.4/32
+            dst_port:
+              description:
+                - Destination port or port range.
+              type: str
+              sample: "443"
+            src_ip:
+              description:
+                - Source IP address or subnet address.
+                - CIDR notation.
+              type: str
+              sample: null
+            src_port:
+              description:
+                - Source port or port range.
+              type: str
+              sample: null
+            protocol:
+              description:
+                - Protocol above IP layer.
+              type: str
+              sample: tcp
+            tcp_flags:
+              description:
+                - TCP flags or logical combination of flags.
+              type: str
+              sample: null
+            action:
+              description:
+                - Action if rule matches.
+                - V(accept) or V(discard).
+              type: str
+              sample: accept
+              choices:
+                - accept
+                - discard
 '''
 
 from ansible.module_utils.basic import AnsibleModule
@@ -195,7 +271,8 @@ def firewall_configured(result, error):
 
 def main():
     argument_spec = dict(
-        server_ip=dict(type='str', required=True),
+        server_ip=dict(type='str'),
+        server_number=dict(type='int'),
         wait_for_configured=dict(type='bool', default=True),
         wait_delay=dict(type='int', default=10),
         timeout=dict(type='int', default=180),
@@ -206,10 +283,10 @@ def main():
         supports_check_mode=True,
     )
 
-    server_ip = module.params['server_ip']
+    server_id = module.params['server_ip'] or module.params['server_number']
 
     # https://robot.your-server.de/doc/webservice/en.html#get-firewall-server-ip
-    url = "{0}/firewall/{1}".format(BASE_URL, server_ip)
+    url = "{0}/firewall/{1}".format(BASE_URL, server_id)
     if module.params['wait_for_configured']:
         try:
             result, error = fetch_url_json_with_retries(

@@ -42,9 +42,24 @@ attributes:
 
 options:
   server_ip:
-    description: The server's main IP address.
-    required: true
+    description:
+      - The server's main IP address.
+      - Exactly one of O(server_ip) and O(server_number) must be specified.
+      - Note that Hetzner deprecated identifying the server's firewall by the server's main IP.
+        Using this option can thus stop working at any time in the future. Use O(server_number) instead.
     type: str
+  server_number:
+    description:
+      - The server's number.
+      - Exactly one of O(server_ip) and O(server_number) must be specified.
+    type: int
+    version_added: 1.8.0
+  filter_ipv6:
+    description:
+      - Whether to filter IPv6 traffic as well.
+      - IPv4 traffic is always filtered, IPv6 traffic filtering needs to be explicitly enabled.
+    type: bool
+    version_added: 1.8.0
   port:
     description:
       - Switch port of firewall.
@@ -54,7 +69,7 @@ options:
   state:
     description:
       - Status of the firewall.
-      - Firewall is active if state is C(present), and disabled if state is C(absent).
+      - Firewall is active if state is V(present), and disabled if state is V(absent).
     type: str
     default: present
     choices: [ present, absent ]
@@ -78,14 +93,15 @@ options:
           name:
             description:
               - Name of the firewall rule.
+              - Note that Hetzner restricts the characters that can be used for rule names. At the moment, only
+                letters C(a-z), C(A-Z), space, and the symbols C(.), C(-), C(+), C(_), and C(@) are allowed.
             type: str
           ip_version:
             description:
               - Internet protocol version.
-              - Note that currently, only IPv4 is supported by Hetzner.
-            required: true
+              - Leave away to filter both protocols. Note that in that case, none of O(rules.input[].dst_ip),
+                O(rules.input[].src_ip), or O(rules.input[].protocol) can be specified.
             type: str
-            choices: [ ipv4, ipv6 ]
           dst_ip:
             description:
               - Destination IP address or subnet address.
@@ -106,13 +122,68 @@ options:
             type: str
           protocol:
             description:
-              - Protocol above IP layer
+              - Protocol above IP layer.
             type: str
           tcp_flags:
             description:
               - TCP flags or logical combination of flags.
-              - Flags supported by Hetzner are C(syn), C(fin), C(rst), C(psh) and C(urg).
-              - They can be combined with C(|) (logical or) and C(&) (logical and).
+              - Flags supported by Hetzner are V(syn), V(fin), V(rst), V(psh) and V(urg).
+              - They can be combined with V(|) (logical or) and V(&) (logical and).
+              - See L(the documentation,https://wiki.hetzner.de/index.php/Robot_Firewall/en#Parameter)
+                for more information.
+            type: str
+          action:
+            description:
+              - Action if rule matches.
+            required: true
+            type: str
+            choices: [ accept, discard ]
+      output:
+        description:
+          - Output firewall rules.
+        type: list
+        elements: dict
+        version_added: 1.8.0
+        suboptions:
+          name:
+            description:
+              - Name of the firewall rule.
+              - Note that Hetzner restricts the characters that can be used for rule names. At the moment, only
+                letters C(a-z), C(A-Z), space, and the symbols C(.), C(-), C(+), C(_), and C(@) are allowed.
+            type: str
+          ip_version:
+            description:
+              - Internet protocol version.
+              - Leave away to filter both protocols. Note that in that case, none of O(rules.output[].dst_ip),
+                O(rules.output[].src_ip), or O(rules.output[].protocol) can be specified.
+            type: str
+          dst_ip:
+            description:
+              - Destination IP address or subnet address.
+              - CIDR notation.
+            type: str
+          dst_port:
+            description:
+              - Destination port or port range.
+            type: str
+          src_ip:
+            description:
+              - Source IP address or subnet address.
+              - CIDR notation.
+            type: str
+          src_port:
+            description:
+              - Source port or port range.
+            type: str
+          protocol:
+            description:
+              - Protocol above IP layer.
+            type: str
+          tcp_flags:
+            description:
+              - TCP flags or logical combination of flags.
+              - Flags supported by Hetzner are V(syn), V(fin), V(rst), V(psh) and V(urg).
+              - They can be combined with V(|) (logical or) and V(&) (logical and).
               - See L(the documentation,https://wiki.hetzner.de/index.php/Robot_Firewall/en#Parameter)
                 for more information.
             type: str
@@ -161,31 +232,36 @@ EXAMPLES = r'''
     hetzner_password: bar
     server_ip: 1.2.3.4
     state: present
+    filter_ipv6: true
     allowlist_hos: true
     rules:
       input:
-        - name: Allow ICMP protocol, so you can ping your server
+        - name: Allow ICMP protocol
+          # This is needed so you can ping your server
           ip_version: ipv4
           protocol: icmp
           action: accept
+          # Note that it is not possible to disable ICMP for IPv6
+          # (https://robot.hetzner.com/doc/webservice/en.html#post-firewall-server-id)
         - name: Allow responses to incoming TCP connections
-          ip_version: ipv4
           protocol: tcp
           dst_port: '32768-65535'
           tcp_flags: ack
           action: accept
-        - name: Allow everything to ports 20-23 from 4.3.2.1/24
+        - name: Allow restricted access from some known IPv4 addresses
+          # Allow everything to ports 20-23 from 4.3.2.1/24 (IPv4 only)
           ip_version: ipv4
           src_ip: 4.3.2.1/24
           dst_port: '20-23'
           action: accept
         - name: Allow everything to port 443
-          ip_version: ipv4
           dst_port: '443'
           action: accept
         - name: Drop everything else
-          ip_version: ipv4
           action: discard
+      output:
+        - name: Accept everything
+          action: accept
   register: result
 
 - ansible.builtin.debug:
@@ -202,7 +278,7 @@ firewall:
     port:
       description:
         - Switch port of firewall.
-        - C(main) or C(kvm).
+        - V(main) or V(kvm).
       type: str
       sample: main
     server_ip:
@@ -218,9 +294,9 @@ firewall:
     status:
       description:
         - Status of the firewall.
-        - C(active) or C(disabled).
-        - Will be C(in process) if the firewall is currently updated, and
-          I(wait_for_configured) is set to C(false) or I(timeout) to a too small value.
+        - V(active) or V(disabled).
+        - Will be V(in process) if the firewall is currently updated, and
+          O(wait_for_configured) is set to V(false) or O(timeout) to a too small value.
       type: str
       sample: active
     allowlist_hos:
@@ -232,7 +308,7 @@ firewall:
     whitelist_hos:
       description:
         - Whether Hetzner services have access.
-        - Old name of return value C(allowlist_hos), will be removed eventually.
+        - Old name of return value V(allowlist_hos), will be removed eventually.
       type: bool
       sample: true
     rules:
@@ -254,6 +330,7 @@ firewall:
             ip_version:
               description:
                 - Internet protocol version.
+                - No value means the rule applies both to IPv4 and IPv6.
               type: str
               sample: ipv4
             dst_ip:
@@ -280,7 +357,7 @@ firewall:
               sample: null
             protocol:
               description:
-                - Protocol above IP layer
+                - Protocol above IP layer.
               type: str
               sample: tcp
             tcp_flags:
@@ -291,9 +368,70 @@ firewall:
             action:
               description:
                 - Action if rule matches.
-                - C(accept) or C(discard).
+                - V(accept) or V(discard).
               type: str
               sample: accept
+              choices:
+                - accept
+                - discard
+        output:
+          description:
+            - Output firewall rules.
+          type: list
+          elements: dict
+          contains:
+            name:
+              description:
+                - Name of the firewall rule.
+              type: str
+              sample: Allow HTTP access to server
+            ip_version:
+              description:
+                - Internet protocol version.
+                - No value means the rule applies both to IPv4 and IPv6.
+              type: str
+              sample: ~
+            dst_ip:
+              description:
+                - Destination IP address or subnet address.
+                - CIDR notation.
+              type: str
+              sample: 1.2.3.4/32
+            dst_port:
+              description:
+                - Destination port or port range.
+              type: str
+              sample: "443"
+            src_ip:
+              description:
+                - Source IP address or subnet address.
+                - CIDR notation.
+              type: str
+              sample: null
+            src_port:
+              description:
+                - Source port or port range.
+              type: str
+              sample: null
+            protocol:
+              description:
+                - Protocol above IP layer.
+              type: str
+              sample: tcp
+            tcp_flags:
+              description:
+                - TCP flags or logical combination of flags.
+              type: str
+              sample: null
+            action:
+              description:
+                - Action if rule matches.
+                - V(accept) or V(discard).
+              type: str
+              sample: accept
+              choices:
+                - accept
+                - discard
 '''
 
 import traceback
@@ -323,7 +461,7 @@ RULE_OPTION_NAMES = [
     'protocol', 'tcp_flags', 'action',
 ]
 
-RULES = ['input']
+RULES = ['input', 'output']
 
 
 def restrict_dict(dictionary, fields):
@@ -335,7 +473,7 @@ def restrict_dict(dictionary, fields):
 
 
 def restrict_firewall_config(config):
-    result = restrict_dict(config, ['port', 'status', 'whitelist_hos'])
+    result = restrict_dict(config, ['port', 'status', 'filter_ipv6', 'whitelist_hos'])
     result['rules'] = dict()
     for ruleset in RULES:
         result['rules'][ruleset] = [
@@ -358,7 +496,7 @@ def update(before, after, params, name, param_name=None):
 
 
 def normalize_ip(ip, ip_version):
-    if ip is None:
+    if ip is None or ip_version is None:
         return ip
     if '/' in ip:
         ip, range = ip.split('/')
@@ -414,14 +552,16 @@ def firewall_configured(result, error):
 
 def main():
     argument_spec = dict(
-        server_ip=dict(type='str', required=True),
+        server_ip=dict(type='str'),
+        server_number=dict(type='int'),
         port=dict(type='str', default='main', choices=['main', 'kvm']),
+        filter_ipv6=dict(type='bool'),
         state=dict(type='str', default='present', choices=['present', 'absent']),
         allowlist_hos=dict(type='bool', aliases=['whitelist_hos']),
         rules=dict(type='dict', options=dict(
             input=dict(type='list', elements='dict', options=dict(
                 name=dict(type='str'),
-                ip_version=dict(type='str', required=True, choices=['ipv4', 'ipv6']),
+                ip_version=dict(type='str'),
                 dst_ip=dict(type='str'),
                 dst_port=dict(type='str'),
                 src_ip=dict(type='str'),
@@ -429,7 +569,18 @@ def main():
                 protocol=dict(type='str'),
                 tcp_flags=dict(type='str'),
                 action=dict(type='str', required=True, choices=['accept', 'discard']),
-            )),
+            ), required_by=dict(dst_ip=['ip_version'], src_ip=['ip_version'], protocol=['ip_version'])),
+            output=dict(type='list', elements='dict', options=dict(
+                name=dict(type='str'),
+                ip_version=dict(type='str'),
+                dst_ip=dict(type='str'),
+                dst_port=dict(type='str'),
+                src_ip=dict(type='str'),
+                src_port=dict(type='str'),
+                protocol=dict(type='str'),
+                tcp_flags=dict(type='str'),
+                action=dict(type='str', required=True, choices=['accept', 'discard']),
+            ), required_by=dict(dst_ip=['ip_version'], src_ip=['ip_version'], protocol=['ip_version'])),
         )),
         update_timeout=dict(type='int', default=30),
         wait_for_configured=dict(type='bool', default=True),
@@ -449,13 +600,14 @@ def main():
     module.params['status'] = 'active' if (module.params['state'] == 'present') else 'disabled'
     if module.params['rules'] is None:
         module.params['rules'] = {}
-    if module.params['rules'].get('input') is None:
-        module.params['rules']['input'] = []
+    for chain in RULES:
+        if module.params['rules'].get(chain) is None:
+            module.params['rules'][chain] = []
 
-    server_ip = module.params['server_ip']
+    server_id = module.params['server_ip'] or module.params['server_number']
 
     # https://robot.your-server.de/doc/webservice/en.html#get-firewall-server-ip
-    url = "{0}/firewall/{1}".format(BASE_URL, server_ip)
+    url = "{0}/firewall/{1}".format(BASE_URL, server_id)
     if module.params['wait_for_configured']:
         try:
             result, error = fetch_url_json_with_retries(
@@ -480,6 +632,7 @@ def main():
     # Build wanted (after) state and compare
     after = dict(before)
     changed = False
+    changed |= update(before, after, module.params, 'filter_ipv6')
     changed |= update(before, after, module.params, 'port')
     changed |= update(before, after, module.params, 'status')
     changed |= update(before, after, module.params, 'whitelist_hos', 'allowlist_hos')
@@ -493,9 +646,10 @@ def main():
     construct_status = None
     if changed and not module.check_mode:
         # https://robot.your-server.de/doc/webservice/en.html#post-firewall-server-ip
-        url = "{0}/firewall/{1}".format(BASE_URL, server_ip)
+        url = "{0}/firewall/{1}".format(BASE_URL, server_id)
         headers = {"Content-type": "application/x-www-form-urlencoded"}
         data = dict(after)
+        data['filter_ipv6'] = str(data['filter_ipv6']).lower()
         data['whitelist_hos'] = str(data['whitelist_hos']).lower()
         del data['rules']
         for ruleset in RULES:

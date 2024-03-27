@@ -4,6 +4,103 @@ Community Hetzner Robot Collection Release Notes
 
 .. contents:: Topics
 
+v1.9.1
+======
+
+Release Summary
+---------------
+
+Bugfix release.
+
+Security Fixes
+--------------
+
+- robot inventory plugin - make sure all data received from the Hetzner robot service server is marked as unsafe, so remote code execution by obtaining texts that can be evaluated as templates is not possible (https://www.die-welt.net/2024/03/remote-code-execution-in-ansible-dynamic-inventory-plugins/, https://github.com/ansible-collections/community.hrobot/pull/99).
+
+v1.9.0
+======
+
+Release Summary
+---------------
+
+Feature and maintenance release.
+
+Minor Changes
+-------------
+
+- robot inventory plugin - the ``filters`` option has been renamed to ``simple_filters``. The old name still works until community.hrobot 2.0.0. Then it will change to allow more complex filtering with the ``community.library_inventory_filtering_v1`` collection's functionality (https://github.com/ansible-collections/community.hrobot/pull/94).
+
+Deprecated Features
+-------------------
+
+- robot inventory plugin - the ``filters`` option has been renamed to ``simple_filters``. The old name will stop working in community.hrobot 2.0.0 (https://github.com/ansible-collections/community.hrobot/pull/94).
+
+v1.8.2
+======
+
+Release Summary
+---------------
+
+Maintenance release with updated documentation.
+
+Bugfixes
+--------
+
+- Show more information (if available) from error messages (https://github.com/ansible-collections/community.hrobot/pull/89).
+
+v1.8.1
+======
+
+Release Summary
+---------------
+
+Maintenance release with updated documentation.
+
+From this version on, community.hrobot is using the new `Ansible semantic markup
+<https://docs.ansible.com/ansible/devel/dev_guide/developing_modules_documenting.html#semantic-markup-within-module-documentation>`__
+in its documentation. If you look at documentation with the ansible-doc CLI tool
+from ansible-core before 2.15, please note that it does not render the markup
+correctly. You should be still able to read it in most cases, but you need
+ansible-core 2.15 or later to see it as it is intended. Alternatively you can
+look at `the devel docsite <https://docs.ansible.com/ansible/devel/collections/community/hrobot/>`__
+for the rendered HTML version of the documentation of the latest release.
+
+Known Issues
+------------
+
+- Ansible markup will show up in raw form on ansible-doc text output for ansible-core before 2.15. If you have trouble deciphering the documentation markup, please upgrade to ansible-core 2.15 (or newer), or read the HTML documentation on https://docs.ansible.com/ansible/devel/collections/community/hrobot/.
+
+v1.8.0
+======
+
+Release Summary
+---------------
+
+Feature release for the Hetzner firewall changes.
+
+Major Changes
+-------------
+
+- firewall - Hetzner added output rules support to the firewall. This change unfortunately means that using old versions of the firewall module will always set the output rule list to empty, thus disallowing the server to send out packets (https://github.com/ansible-collections/community.hrobot/issues/75, https://github.com/ansible-collections/community.hrobot/pull/76).
+
+Minor Changes
+-------------
+
+- firewall, firewall_info - add ``filter_ipv6`` and ``rules.output`` output to support the new IPv6 filtering and output rules features (https://github.com/ansible-collections/community.hrobot/issues/75, https://github.com/ansible-collections/community.hrobot/pull/76).
+- firewall, firewall_info - add ``server_number`` option that can be used instead of ``server_ip`` to identify the server. Hetzner deprecated configuring the firewall by ``server_ip``, so using ``server_ip`` will stop at some point in the future (https://github.com/ansible-collections/community.hrobot/pull/77).
+
+v1.7.0
+======
+
+Release Summary
+---------------
+
+Feature release.
+
+New Modules
+-----------
+
+- community.hrobot.v_switch - Manage Hetzner's vSwitch
 
 v1.6.0
 ======
@@ -193,7 +290,6 @@ Release Summary
 ---------------
 
 The ``community.hrobot`` continues the work on the Hetzner Robot modules from their state in ``community.general`` 1.2.0. The changes listed here are thus relative to the modules ``community.general.hetzner_*``.
-
 
 Breaking Changes / Porting Guide
 --------------------------------

@@ -8,6 +8,7 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 
+from ansible.module_utils.common.text.converters import to_native
 from ansible.module_utils.six import PY3
 from ansible.module_utils.six.moves.urllib.error import HTTPError
 from ansible.module_utils.urls import fetch_url, open_url
@@ -26,6 +27,38 @@ ROBOT_DEFAULT_ARGUMENT_SPEC = dict(
 BASE_URL = "https://robot-ws.your-server.de"
 
 
+def get_x_www_form_urlenconded_dict_from_list(key, values):
+    '''Return a dictionary with keys values'''
+    if len(values) == 1:
+        return {'{key}[]'.format(key=key): values[0]}
+    else:
+        return dict(('{key}[{index}]'.format(key=key, index=i), x) for i, x in enumerate(values))
+
+
+def _format_list(obj):
+    if not isinstance(obj, (list, tuple)):
+        return to_native(obj)
+    return [_format_list(e) for e in obj]
+
+
+def format_error_msg(error):
+    # Reference: https://robot.hetzner.com/doc/webservice/en.html#errors
+    msg = 'Request failed: {0} {1} ({2})'.format(
+        error['status'],
+        error['code'],
+        error['message'],
+    )
+    if error.get('missing'):
+        msg += '. Missing input parameters: {0}'.format(_format_list(error['missing']))
+    if error.get('invalid'):
+        msg += '. Invalid input parameters: {0}'.format(_format_list(error['invalid']))
+    if error.get('max_request') is not None:
+        msg += '. Maximum allowed requests: {0}'.format(error['max_request'])
+    if error.get('interval') is not None:
+        msg += '. Time interval in seconds: {0}'.format(error['interval'])
+    return msg
+
+
 class PluginException(Exception):
     def __init__(self, message):
         super(PluginException, self).__init__(message)
@@ -33,7 +66,8 @@ class PluginException(Exception):
 
 
 def plugin_open_url_json(plugin, url, method='GET', timeout=10, data=None, headers=None,
-                         accept_errors=None, allow_empty_result=False, templar=None):
+                         accept_errors=None, allow_empty_result=False,
+                         allowed_empty_result_status_codes=(200, 204), templar=None):
     '''
     Make general request to Hetzner's JSON robot API.
     '''
@@ -68,7 +102,7 @@ def plugin_open_url_json(plugin, url, method='GET', timeout=10, data=None, heade
         raise PluginException('Failed request to Hetzner Robot server endpoint {0}: {1}'.format(url, e))
 
     if not content:
-        if allow_empty_result and status in (200, 204):
+        if allow_empty_result and status in allowed_empty_result_status_codes:
             return None, None
         raise PluginException('Cannot retrieve content from {0}, HTTP status code {1}'.format(url, status))
 
@@ -78,18 +112,15 @@ def plugin_open_url_json(plugin, url, method='GET', timeout=10, data=None, heade
             if accept_errors:
                 if result['error']['code'] in accept_errors:
                     return result, result['error']['code']
-            raise PluginException('Request failed: {0} {1} ({2})'.format(
-                result['error']['status'],
-                result['error']['code'],
-                result['error']['message']
-            ))
+            raise PluginException(format_error_msg(result['error']))
         return result, None
     except ValueError:
         raise PluginException('Cannot decode content retrieved from {0}'.format(url))
 
 
 def fetch_url_json(module, url, method='GET', timeout=10, data=None, headers=None,
-                   accept_errors=None, allow_empty_result=False):
+                   accept_errors=None, allow_empty_result=False,
+                   allowed_empty_result_status_codes=(200, 204)):
     '''
     Make general request to Hetzner's JSON robot API.
     '''
@@ -107,7 +138,7 @@ def fetch_url_json(module, url, method='GET', timeout=10, data=None, headers=Non
         content = info.pop('body', None)
 
     if not content:
-        if allow_empty_result and info.get('status') in (200, 204):
+        if allow_empty_result and info.get('status') in allowed_empty_result_status_codes:
             return None, None
         module.fail_json(msg='Cannot retrieve content from {0}, HTTP status code {1}'.format(url, info.get('status')))
 
@@ -117,11 +148,7 @@ def fetch_url_json(module, url, method='GET', timeout=10, data=None, headers=Non
             if accept_errors:
                 if result['error']['code'] in accept_errors:
                     return result, result['error']['code']
-            module.fail_json(msg='Request failed: {0} {1} ({2})'.format(
-                result['error']['status'],
-                result['error']['code'],
-                result['error']['message']
-            ))
+            module.fail_json(msg=format_error_msg(result['error']), error=result['error'])
         return result, None
     except ValueError:
         module.fail_json(msg='Cannot decode content retrieved from {0}'.format(url))

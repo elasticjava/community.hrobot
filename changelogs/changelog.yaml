@@ -178,3 +178,105 @@ releases:
     - 1.6.0.yml
     - action_group.yml
     release_date: '2022-11-06'
+  1.7.0:
+    changes:
+      release_summary: Feature release.
+    fragments:
+    - 1.7.0.yml
+    modules:
+    - description: Manage Hetzner's vSwitch
+      name: v_switch
+      namespace: ''
+    release_date: '2023-01-27'
+  1.8.0:
+    changes:
+      major_changes:
+      - firewall - Hetzner added output rules support to the firewall. This change
+        unfortunately means that using old versions of the firewall module will always
+        set the output rule list to empty, thus disallowing the server to send out
+        packets (https://github.com/ansible-collections/community.hrobot/issues/75,
+        https://github.com/ansible-collections/community.hrobot/pull/76).
+      minor_changes:
+      - firewall, firewall_info - add ``filter_ipv6`` and ``rules.output`` output
+        to support the new IPv6 filtering and output rules features (https://github.com/ansible-collections/community.hrobot/issues/75,
+        https://github.com/ansible-collections/community.hrobot/pull/76).
+      - firewall, firewall_info - add ``server_number`` option that can be used instead
+        of ``server_ip`` to identify the server. Hetzner deprecated configuring the
+        firewall by ``server_ip``, so using ``server_ip`` will stop at some point
+        in the future (https://github.com/ansible-collections/community.hrobot/pull/77).
+      release_summary: Feature release for the Hetzner firewall changes.
+    fragments:
+    - 1.8.0.yml
+    - 76-firewall-ipv6-output.yml
+    - 77-firewall-server_number.yml
+    release_date: '2023-03-15'
+  1.8.1:
+    changes:
+      known_issues:
+      - Ansible markup will show up in raw form on ansible-doc text output for ansible-core
+        before 2.15. If you have trouble deciphering the documentation markup, please
+        upgrade to ansible-core 2.15 (or newer), or read the HTML documentation on
+        https://docs.ansible.com/ansible/devel/collections/community/hrobot/.
+      release_summary: 'Maintenance release with updated documentation.
+
+
+        From this version on, community.hrobot is using the new `Ansible semantic
+        markup
+
+        <https://docs.ansible.com/ansible/devel/dev_guide/developing_modules_documenting.html#semantic-markup-within-module-documentation>`__
+
+        in its documentation. If you look at documentation with the ansible-doc CLI
+        tool
+
+        from ansible-core before 2.15, please note that it does not render the markup
+
+        correctly. You should be still able to read it in most cases, but you need
+
+        ansible-core 2.15 or later to see it as it is intended. Alternatively you
+        can
+
+        look at `the devel docsite <https://docs.ansible.com/ansible/devel/collections/community/hrobot/>`__
+
+        for the rendered HTML version of the documentation of the latest release.
+
+        '
+    fragments:
+    - 1.8.1.yml
+    - semantic-markup.yml
+    release_date: '2023-06-27'
+  1.8.2:
+    changes:
+      bugfixes:
+      - Show more information (if available) from error messages (https://github.com/ansible-collections/community.hrobot/pull/89).
+      release_summary: Maintenance release with updated documentation.
+    fragments:
+    - 1.8.2.yml
+    - 89-firewall.yml
+    release_date: '2023-11-11'
+  1.9.0:
+    changes:
+      deprecated_features:
+      - robot inventory plugin - the ``filters`` option has been renamed to ``simple_filters``.
+        The old name will stop working in community.hrobot 2.0.0 (https://github.com/ansible-collections/community.hrobot/pull/94).
+      minor_changes:
+      - robot inventory plugin - the ``filters`` option has been renamed to ``simple_filters``.
+        The old name still works until community.hrobot 2.0.0. Then it will change
+        to allow more complex filtering with the ``community.library_inventory_filtering_v1``
+        collection's functionality (https://github.com/ansible-collections/community.hrobot/pull/94).
+      release_summary: Feature and maintenance release.
+    fragments:
+    - 1.9.0.yml
+    - 94-inventory-filters.yml
+    release_date: '2024-01-21'
+  1.9.1:
+    changes:
+      release_summary: Bugfix release.
+      security_fixes:
+      - robot inventory plugin - make sure all data received from the Hetzner robot
+        service server is marked as unsafe, so remote code execution by obtaining
+        texts that can be evaluated as templates is not possible (https://www.die-welt.net/2024/03/remote-code-execution-in-ansible-dynamic-inventory-plugins/,
+        https://github.com/ansible-collections/community.hrobot/pull/99).
+    fragments:
+    - 1.9.1.yml
+    - inventory-rce.yml
+    release_date: '2024-03-16'

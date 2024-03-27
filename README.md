@@ -15,7 +15,7 @@ Please note that this collection does **not** support Windows targets.
 
 ## Tested with Ansible
 
-Tested with the current Ansible 2.9, ansible-base 2.10, ansible-core 2.11, ansible-core 2.12, ansible-core 2.13, and ansible-core 2.14 releases and the current development version of ansible-core. Ansible versions before 2.9.10 are not supported.
+Tested with the current Ansible 2.9, ansible-base 2.10, ansible-core 2.11, ansible-core 2.12, ansible-core 2.13, ansible-core 2.14, ansible-core 2.15, and ansible-core 2.16 releases and the current development version of ansible-core. Ansible versions before 2.9.10 are not supported.
 
 ## External requirements
 
@@ -37,7 +37,7 @@ If you use the Ansible package and do not update collections independently, use 
 - `community.hrobot.failover_ip_info` module
 - `community.hrobot.firewall` module
 - `community.hrobot.firewall_info` module
-- `community.hrobot.hrobot` inventory plugin
+- `community.hrobot.robot` inventory plugin
 
 You can find [documentation for the modules and plugins in this collection here](https://docs.ansible.com/ansible/devel/collections/community/hrobot/).
 
@@ -64,7 +64,7 @@ You can find more information in the [developer guide for collections](https://d
 
 ## Release notes
 
-See the [changelog](https://github.com/ansible-collections/community.hrobot/tree/main/CHANGELOG.rst).
+See the [changelog](https://github.com/ansible-collections/community.hrobot/tree/main/CHANGELOG.md).
 
 ## More information
 
